@@ -40,7 +40,7 @@ namespace MyNamespace.EditorSpriteExtractor.Window
         public static GUIStyle HelpBox { get; private set; } = new GUIStyle(EditorStyles.helpBox)
         {
             alignment = TextAnchor.UpperRight,
-            padding = new RectOffset(0, 13, 12, 13),
+            padding = new RectOffset(12, 12, 12, 12),
         };
     }
 }

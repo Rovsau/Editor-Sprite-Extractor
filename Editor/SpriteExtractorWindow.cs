@@ -26,34 +26,25 @@ namespace MyNamespace.EditorSpriteExtractor.Window
     internal class SpriteExtractorWindow : EditorWindow
     {
         #region Constants
-        private const string __README_HEADER = 
-            "Recommended Import Settings\n" +
-            "Max Texture Size:  8192\n" +
-            "(to prevent downsampling)\n\n\n";
-
-        private const string __README_SPRITE_ATLAS =
-            __README_HEADER +
-            "\n" +
-            "Extract All Sprites from their Sprite Atlas.";
+        private const string __README_HEADER = "";
 
         private const string __README_TEXTURE2D = 
             __README_HEADER + 
-            "\n" +
-            "Extract All Sprites from multiple Spritesheets.";
+            "Extract all Sprites from a Texture2D with Sprite Mode: Single or Multiple.";
 
-        private const string __README_SPRITE =
+        private const string __README_TEXTURE2DARRAY =
             __README_HEADER +
-            "\n" +
-            "Extract Sprites from their source Spritesheets.";
+            "Extract all elements from a Texture2DArray with predefined Columns and Rows.";
 
-        private const string __helpBoxMessage = 
-            "Required Texture2D Import Settings\n" +
-            "Texture Type:  Sprite\n" +
-            "Read/Write:  True\n\n" +//
-            "Recommended Import Settings\n" +
-            "Import Mode:  Multiple\n" +
-            "Max Texture Size:  8192\n" +
-            "(to prevent downsampling)";
+        private const string __README_SPRITES =
+            __README_HEADER +
+            "Extract Sprites from their source Texture2D with Sprite Mode: Single or Multiple.";
+
+        private const string __README_SPRITE_ATLAS =
+            __README_HEADER +
+            "Extract all Sprites in a Sprite Atlas, from their respective texture files.\n";
+
+        private string _readMe;
         #endregion
 
         #region Variables
@@ -61,16 +52,16 @@ namespace MyNamespace.EditorSpriteExtractor.Window
         private static bool _isOpen;
 
         // Arrays.
-        public Texture2D[] _textures;
+        public Texture2D[] _texture2D;
         public Sprite[] _sprites;
-        public SpriteAtlas[] _atlases;
-        public Texture2DArray[] _textureArrays;
+        public SpriteAtlas[] _spriteAtlas;
+        public Texture2DArray[] _texture2DArray;
 
         private SerializedObject _serializedObject;
-        private SerializedProperty m_textures;
+        private SerializedProperty m_texture2D;
         private SerializedProperty m_sprites;
-        private SerializedProperty m_atlases;
-        private SerializedProperty m_textureArrays;
+        private SerializedProperty m_spriteAtlas;
+        private SerializedProperty m_texture2DArray;
 
         // Radio.
         private ESelection _selected;
@@ -117,16 +108,16 @@ namespace MyNamespace.EditorSpriteExtractor.Window
         {
             // Initialize default values.
             _sprites = new Sprite[3];
-            _textures = new Texture2D[3];
-            _atlases = new SpriteAtlas[3];
-            _textureArrays = new Texture2DArray[3];
-            _arrayCount = new Vector2Int(_textures.Length, _sprites.Length);
+            _texture2D = new Texture2D[3];
+            _spriteAtlas = new SpriteAtlas[3];
+            _texture2DArray = new Texture2DArray[3];
+            _arrayCount = new Vector2Int(_texture2D.Length, _sprites.Length);
 
             _serializedObject = new SerializedObject(this);
-            m_textures = _serializedObject.FindProperty(nameof(_textures));
+            m_texture2D = _serializedObject.FindProperty(nameof(_texture2D));
             m_sprites = _serializedObject.FindProperty(nameof(_sprites));
-            m_atlases = _serializedObject.FindProperty(nameof(_atlases));
-            m_textureArrays = _serializedObject.FindProperty(nameof(_textureArrays));
+            m_spriteAtlas = _serializedObject.FindProperty(nameof(_spriteAtlas));
+            m_texture2DArray = _serializedObject.FindProperty(nameof(_texture2DArray));
 
             _encodeToFormat = SpriteExtractorCore.EncodeToFormat.Source;
             _lastOutputFilePath = string.Empty;
@@ -134,10 +125,10 @@ namespace MyNamespace.EditorSpriteExtractor.Window
             EditorGUIUtility.labelWidth = 128f;
 
             // Expand the arrays.
-            m_textures.isExpanded = true;
+            m_texture2D.isExpanded = true;
             m_sprites.isExpanded = true;
-            m_atlases.isExpanded = true;
-            m_textureArrays.isExpanded = true;
+            m_spriteAtlas.isExpanded = true;
+            m_texture2DArray.isExpanded = true;
 
             // Prepare Enum Radio selection.
             ESelection[] eSelections = (ESelection[])System.Enum.GetValues(typeof(ESelection));
@@ -228,16 +219,16 @@ namespace MyNamespace.EditorSpriteExtractor.Window
                 switch (_selected)
                 {
                     case ESelection.Texture_2D:
-                        RemoveDuplicates(m_textures);
+                        RemoveDuplicates(m_texture2D);
                         break;
                     case ESelection.Texture_2D_Array:
-                        RemoveDuplicates(m_textureArrays);
+                        RemoveDuplicates(m_texture2DArray);
                         break;
                     case ESelection.Sprites:
                         RemoveDuplicates(m_sprites);
                         break;
                     case ESelection.Sprite_Atlas:
-                        RemoveDuplicates(m_atlases);
+                        RemoveDuplicates(m_spriteAtlas);
                         break;
                 }
                 
@@ -246,16 +237,16 @@ namespace MyNamespace.EditorSpriteExtractor.Window
                 switch (_selected)
                 {
                     case ESelection.Texture_2D:
-                        SpriteExtractorCore.Extract(_textures, _outputFolderPath, _encodeToFormat);
+                        SpriteExtractorCore.Extract(_texture2D, _outputFolderPath, _encodeToFormat);
                         break;
                     case ESelection.Texture_2D_Array:
-                        SpriteExtractorCore.Extract(_textureArrays, _outputFolderPath, _encodeToFormat);
+                        SpriteExtractorCore.Extract(_texture2DArray, _outputFolderPath, _encodeToFormat);
                         break;
                     case ESelection.Sprites:
                         SpriteExtractorCore.Extract(_sprites, _outputFolderPath, _encodeToFormat);
                         break;
                     case ESelection.Sprite_Atlas:
-                        SpriteExtractorCore.Extract(_atlases, _outputFolderPath, _encodeToFormat);
+                        SpriteExtractorCore.Extract(_spriteAtlas, _outputFolderPath, _encodeToFormat);
                         break;
                 }
 
@@ -267,7 +258,22 @@ namespace MyNamespace.EditorSpriteExtractor.Window
             EditorGUILayout.EndVertical();
             EditorGUILayout.BeginVertical();
             #region Help Box
-            EditorGUILayout.LabelField((_selected == ESelection.Texture_2D) ? __README_TEXTURE2D : __README_SPRITE, SpriteExtractorStyles.HelpBox);
+            switch (_selected)
+            {
+                case ESelection.Texture_2D:
+                    _readMe = __README_TEXTURE2D;
+                    break;
+                case ESelection.Texture_2D_Array:
+                    _readMe = __README_TEXTURE2DARRAY;
+                    break;
+                case ESelection.Sprites:
+                    _readMe = __README_SPRITES;
+                    break;
+                case ESelection.Sprite_Atlas:
+                    _readMe = __README_SPRITE_ATLAS;
+                    break;
+            }
+            EditorGUILayout.LabelField(_readMe, SpriteExtractorStyles.HelpBox);
             #endregion
             EditorGUILayout.EndVertical();
             EditorGUILayout.EndHorizontal();
@@ -282,16 +288,16 @@ namespace MyNamespace.EditorSpriteExtractor.Window
             switch (_selected)
             {
                 case ESelection.Texture_2D:
-                    EditorGUILayout.PropertyField(m_textures, true);
+                    EditorGUILayout.PropertyField(m_texture2D, true);
                     break;
                 case ESelection.Texture_2D_Array:
-                    EditorGUILayout.PropertyField(m_textureArrays, true);
+                    EditorGUILayout.PropertyField(m_texture2DArray, true);
                     break;
                 case ESelection.Sprites:
                     EditorGUILayout.PropertyField(m_sprites, true);
                     break;
                 case ESelection.Sprite_Atlas:
-                    EditorGUILayout.PropertyField(m_atlases, true);
+                    EditorGUILayout.PropertyField(m_spriteAtlas, true);
                     break;
             }
             EditorGUILayout.EndScrollView();
@@ -340,11 +346,11 @@ namespace MyNamespace.EditorSpriteExtractor.Window
 
         private void RemoveFullyProcessed_Texture2D(System.Object sender, Texture2D texture2D)
         {
-            for (int i = 0; i < _textures.Length; i++)
+            for (int i = 0; i < _texture2D.Length; i++)
             {
-                if (_textures[i].Equals(texture2D))
+                if (_texture2D[i].Equals(texture2D))
                 {
-                    m_textures.DeleteArrayElementAtIndex(i);
+                    m_texture2D.DeleteArrayElementAtIndex(i);
                     Debug.Log($"Post Process Removed:  {texture2D.name}");
                     break;
                 }
@@ -355,11 +361,11 @@ namespace MyNamespace.EditorSpriteExtractor.Window
 
         private void RemoveFullyProcessed_Texture2DArray(System.Object sender, Texture2DArray texture2DArray)
         {
-            for (int i = 0; i < _textureArrays.Length; i++)
+            for (int i = 0; i < _texture2DArray.Length; i++)
             {
-                if (_textureArrays[i].Equals(texture2DArray))
+                if (_texture2DArray[i].Equals(texture2DArray))
                 {
-                    m_textureArrays.DeleteArrayElementAtIndex(i);
+                    m_texture2DArray.DeleteArrayElementAtIndex(i);
                     Debug.Log($"Post Process Removed:  {texture2DArray.name}");
                     break;
                 }
@@ -385,11 +391,11 @@ namespace MyNamespace.EditorSpriteExtractor.Window
 
         private void RemoveFullyProcessed_SpriteAtlas(System.Object sender, SpriteAtlas atlas)
         {
-            for (int i = 0; i < _atlases.Length; i++)
+            for (int i = 0; i < _spriteAtlas.Length; i++)
             {
-                if (_atlases[i].Equals(atlas))
+                if (_spriteAtlas[i].Equals(atlas))
                 {
-                    m_atlases.DeleteArrayElementAtIndex(i);
+                    m_spriteAtlas.DeleteArrayElementAtIndex(i);
                     Debug.Log($"Post Process Removed:  {atlas.name}");
                     break;
                 }
@@ -401,9 +407,9 @@ namespace MyNamespace.EditorSpriteExtractor.Window
         private void ConditionallyUpdateSerializedProperties()
         {
             // If the array size has changed.
-            if (m_textures.arraySize != _arrayCount.x || m_sprites.arraySize != _arrayCount.y)
+            if (m_texture2D.arraySize != _arrayCount.x || m_sprites.arraySize != _arrayCount.y)
             {
-                _arrayCount.x = m_textures.arraySize;
+                _arrayCount.x = m_texture2D.arraySize;
                 _arrayCount.y = m_sprites.arraySize;
 
                 // Necessary in order to get the proper context menu when right-clicking array elements. 

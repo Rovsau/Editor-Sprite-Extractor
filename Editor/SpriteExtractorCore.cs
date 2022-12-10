@@ -1,53 +1,28 @@
-using PlasticPipe.Tube;
 using System;
 using System.IO;
-using System.Security.Policy;
-using Unity.Collections;
 using UnityEditor;
-using UnityEditor.U2D;
 using UnityEngine;
-using UnityEngine.Rendering;
 using UnityEngine.U2D;
-using static MyNamespace.EditorSpriteExtractor.SpriteExtractorCore;
 
 namespace MyNamespace.EditorSpriteExtractor
 {
-
     public static class SpriteExtractorCore
     {
-        /* To Do
-         * 
-         *  Texture2DArray
-         *  SpriteAtlas
-         *  
-         *  DRY filePath
-         *  Extensions (this)
-         *  
-         */
-
-        /* Notes
-         * 
-         *  Non Power of 2 problems can be fixed by 
-         *  packing the sprite into a Sprite Atlas, 
-         *  which will always be a power of 2. 
-         *  
-         *  Or adjusting 'Non-Power of 2' in Texture Import settings for the asset. 
-         *  
-         *  https://docs.unity3d.com/ScriptReference/Graphics.CopyTexture.html
-         *  Graphics.CopyTexture()
-         *  
-         *  Encoding format recognized by file extension. Can be improved?
-         * 
-         */
-
         /* Read Me
          * 
          *  This class does not modify any existing files. 
          *  Exception:  Will overwrite files with the same path and name as the output.
          *  
-         *  Texture files do Not need isReadable, 
-         *  because the file bytes are read by System.IO, 
-         *  and loaded directly into a Texture2D.
+         *  Encoding format is recognized by file extension.
+         *  
+         *  Texture Import settings such as isReadable are irrelevant, 
+         *  because the file bytes are read by System.IO, bypassing TextureImporter settings, 
+         *  and loaded directly into a temporary Texture2D.
+         *  
+         *  Exception: 
+         *      Texture2D 
+         *      Texture Type:   2D Sprite 
+         *      Sprite Mode:    Single or Multiple
          * 
          */
 
@@ -76,7 +51,7 @@ namespace MyNamespace.EditorSpriteExtractor
         #endregion
 
         // Extract SpriteAtlas.
-        public static void Extract(SpriteAtlas[] spriteAtlas_array, string outputFolderPath, EncodeToFormat encodeToFormat)
+        public static void Extract(this SpriteAtlas[] spriteAtlas_array, string outputFolderPath, EncodeToFormat encodeToFormat)
         {
             foreach (SpriteAtlas atlas in spriteAtlas_array)
             {
@@ -84,10 +59,10 @@ namespace MyNamespace.EditorSpriteExtractor
             }
         }
 
-        public static void Extract(SpriteAtlas atlas, string outputFolderPath, EncodeToFormat encodeToFormat)
+        public static void Extract(this SpriteAtlas atlas, string outputFolderPath, EncodeToFormat encodeToFormat)
         {
             string path = AssetDatabase.GetAssetPath(atlas);
-            Sprite[] sprites = new Sprite[atlas.spriteCount];// = (Sprite[])AssetDatabase.LoadAllAssetRepresentationsAtPath(path); // Specified Cast is not valid. 
+            Sprite[] sprites = new Sprite[atlas.spriteCount];
             atlas.GetSprites(sprites);
 
             foreach (Sprite sprite in sprites)
@@ -100,7 +75,7 @@ namespace MyNamespace.EditorSpriteExtractor
         }
 
         // Extract Texture2DArray.
-        public static void Extract(Texture2DArray[] texture2dArrayArray, string outputFolderPath, EncodeToFormat encodeToFormat)
+        public static void Extract(this Texture2DArray[] texture2dArrayArray, string outputFolderPath, EncodeToFormat encodeToFormat)
         {
             foreach (Texture2DArray array in texture2dArrayArray)
             {
@@ -108,15 +83,12 @@ namespace MyNamespace.EditorSpriteExtractor
             }
         }
 
-        public static void Extract(Texture2DArray texture2dArray, string outputFolderPath, EncodeToFormat encodeToFormat)
+        public static void Extract(this Texture2DArray texture2dArray, string outputFolderPath, EncodeToFormat encodeToFormat)
         {
             // Get texture element size. 
             TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(texture2dArray));
             TextureImporterSettings settings = new TextureImporterSettings();
             importer.ReadTextureSettings(settings);
-
-            int rows = settings.flipbookRows;
-            int columns = settings.flipbookColumns;
 
             // Readability.
             Vector2Int size = new Vector2Int()
@@ -125,17 +97,15 @@ namespace MyNamespace.EditorSpriteExtractor
                 y = texture2dArray.height
             };
 
-            Debug.Log($"size: {size}");
-
             // Create Rects for each element.
             Rect[] rects = new Rect[texture2dArray.depth];
 
             int index = 0;
             int x = 0;
             int y = 0;
-            for (int row = 0; row < rows; row++)
+            for (int row = 0; row < settings.flipbookRows; row++)
             {
-                for (int column = 0; column < columns; column++)
+                for (int column = 0; column < settings.flipbookColumns; column++)
                 {
                     rects[index++] = new Rect(x, y, size.x, size.y);
                     x += size.x;
@@ -164,7 +134,7 @@ namespace MyNamespace.EditorSpriteExtractor
         }
 
         // Extract Texture2D.
-        public static void Extract(Texture2D[] array, string outputFolderPath, EncodeToFormat encodeToFormat)
+        public static void Extract(this Texture2D[] array, string outputFolderPath, EncodeToFormat encodeToFormat)
         {
             foreach (Texture2D texture in array)
             {
@@ -172,7 +142,7 @@ namespace MyNamespace.EditorSpriteExtractor
             }
         }
 
-        public static void Extract(Texture2D texture2d, string outputFolderPath, EncodeToFormat encodeToFormat)
+        public static void Extract(this Texture2D texture2d, string outputFolderPath, EncodeToFormat encodeToFormat)
         {
             // If this validation fails, the Texture2D is not processed.
             TextureImporter importer = (TextureImporter)TextureImporter.GetAtPath(AssetDatabase.GetAssetPath(texture2d));
@@ -196,7 +166,7 @@ namespace MyNamespace.EditorSpriteExtractor
         }
 
         // Extract Sprites.
-        public static void Extract(Sprite[] sprites, string outputFolderPath, EncodeToFormat encodeToFormat, Texture2D rawTexture = null)
+        public static void Extract(this Sprite[] sprites, string outputFolderPath, EncodeToFormat encodeToFormat, Texture2D rawTexture = null)
         {
             foreach (Sprite sprite in sprites)
             {
@@ -208,7 +178,7 @@ namespace MyNamespace.EditorSpriteExtractor
             }
         }
 
-        public static void Extract(Sprite sprite, string outputFileNamePath, EncodeToFormat encodeToFormat, Texture2D rawTexture = null)
+        public static void Extract(this Sprite sprite, string outputFileNamePath, EncodeToFormat encodeToFormat, Texture2D rawTexture = null)
         {
             GetEncodeToFormat(sprite.texture, ref encodeToFormat);
 
@@ -229,8 +199,7 @@ namespace MyNamespace.EditorSpriteExtractor
         }
 
         // Fix file name, because Sprites do not always have unique names. Create the file name for the sprite beforehand, with a number. 
-
-        public static void GetEncodeToFormat(Texture texture, ref EncodeToFormat encodeToFormat)
+        private static void GetEncodeToFormat(Texture texture, ref EncodeToFormat encodeToFormat)
         {
             string filePath = AssetDatabase.GetAssetPath(texture);
             FileInfo file = new FileInfo(filePath);
@@ -246,7 +215,7 @@ namespace MyNamespace.EditorSpriteExtractor
             }
         }
 
-        public static void EncodeAndWriteToDisk(Texture2D rawTexture2d, ref string outputFileNamePath, EncodeToFormat encodeToFormat)
+        private static void EncodeAndWriteToDisk(Texture2D rawTexture2d, ref string outputFileNamePath, EncodeToFormat encodeToFormat)
         {
             // Encode Data.
             byte[] data;
