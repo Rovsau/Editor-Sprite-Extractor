@@ -64,11 +64,13 @@ namespace MyNamespace.EditorSpriteExtractor.Window
         public Texture2D[] _textures;
         public Sprite[] _sprites;
         public SpriteAtlas[] _atlases;
+        public Texture2DArray[] _textureArrays;
 
         private SerializedObject _serializedObject;
         private SerializedProperty m_textures;
         private SerializedProperty m_sprites;
         private SerializedProperty m_atlases;
+        private SerializedProperty m_textureArrays;
 
         // Radio.
         private ESelection _selected;
@@ -91,6 +93,7 @@ namespace MyNamespace.EditorSpriteExtractor.Window
         private enum ESelection
         {
             Texture_2D,
+            Texture_2D_Array,
             Sprites,
             Sprite_Atlas
         }
@@ -116,12 +119,14 @@ namespace MyNamespace.EditorSpriteExtractor.Window
             _sprites = new Sprite[3];
             _textures = new Texture2D[3];
             _atlases = new SpriteAtlas[3];
+            _textureArrays = new Texture2DArray[3];
             _arrayCount = new Vector2Int(_textures.Length, _sprites.Length);
 
             _serializedObject = new SerializedObject(this);
             m_textures = _serializedObject.FindProperty(nameof(_textures));
             m_sprites = _serializedObject.FindProperty(nameof(_sprites));
             m_atlases = _serializedObject.FindProperty(nameof(_atlases));
+            m_textureArrays = _serializedObject.FindProperty(nameof(_textureArrays));
 
             _encodeToFormat = SpriteExtractorCore.EncodeToFormat.Source;
             _lastOutputFilePath = string.Empty;
@@ -132,6 +137,7 @@ namespace MyNamespace.EditorSpriteExtractor.Window
             m_textures.isExpanded = true;
             m_sprites.isExpanded = true;
             m_atlases.isExpanded = true;
+            m_textureArrays.isExpanded = true;
 
             // Prepare Enum Radio selection.
             ESelection[] eSelections = (ESelection[])System.Enum.GetValues(typeof(ESelection));
@@ -144,11 +150,17 @@ namespace MyNamespace.EditorSpriteExtractor.Window
             }
 
             // Subscribe to receive data for post-processing. 
-            SpriteExtractorCore.OnProcessed_Texture -= RemoveFullyProcessed_TextureFromArray;
-            SpriteExtractorCore.OnProcessed_Texture += RemoveFullyProcessed_TextureFromArray;
+            SpriteExtractorCore.OnProcessed_Texture -= RemoveFullyProcessed_Texture2D;
+            SpriteExtractorCore.OnProcessed_Texture += RemoveFullyProcessed_Texture2D;
 
-            SpriteExtractorCore.OnProcessed_Sprite -= RemoveFullyProcessed_SpriteFromArray;
-            SpriteExtractorCore.OnProcessed_Sprite += RemoveFullyProcessed_SpriteFromArray;
+            SpriteExtractorCore.OnProcessed_Texture2DArray -= RemoveFullyProcessed_Texture2DArray;
+            SpriteExtractorCore.OnProcessed_Texture2DArray += RemoveFullyProcessed_Texture2DArray;
+
+            SpriteExtractorCore.OnProcessed_Sprite -= RemoveFullyProcessed_Sprite;
+            SpriteExtractorCore.OnProcessed_Sprite += RemoveFullyProcessed_Sprite;
+
+            SpriteExtractorCore.OnProcessed_SpriteAtlas -= RemoveFullyProcessed_SpriteAtlas;
+            SpriteExtractorCore.OnProcessed_SpriteAtlas += RemoveFullyProcessed_SpriteAtlas;
 
             SpriteExtractorCore.OnProcessed_OutputFilePath -= GetProcessedOutputFilePath;
             SpriteExtractorCore.OnProcessed_OutputFilePath += GetProcessedOutputFilePath;
@@ -158,8 +170,10 @@ namespace MyNamespace.EditorSpriteExtractor.Window
         {
             _isOpen = false;
 
-            SpriteExtractorCore.OnProcessed_Texture -= RemoveFullyProcessed_TextureFromArray;
-            SpriteExtractorCore.OnProcessed_Sprite -= RemoveFullyProcessed_SpriteFromArray;
+            SpriteExtractorCore.OnProcessed_Texture -= RemoveFullyProcessed_Texture2D;
+            SpriteExtractorCore.OnProcessed_Texture2DArray -= RemoveFullyProcessed_Texture2DArray;
+            SpriteExtractorCore.OnProcessed_Sprite -= RemoveFullyProcessed_Sprite;
+            SpriteExtractorCore.OnProcessed_SpriteAtlas -= RemoveFullyProcessed_SpriteAtlas;
             SpriteExtractorCore.OnProcessed_OutputFilePath -= GetProcessedOutputFilePath;
         }
         #endregion
@@ -169,7 +183,7 @@ namespace MyNamespace.EditorSpriteExtractor.Window
             // 
             ConditionallyUpdateSerializedProperties();
 
-            // Reject selections that are not real folders. 
+            // Reject selections that are not real folders. (DefaultAsset workaround). 
             if (_outputFolder != null && !AssetDatabase.IsValidFolder(AssetDatabase.GetAssetPath(_outputFolder))) _outputFolder = null;
         }
 
@@ -216,6 +230,9 @@ namespace MyNamespace.EditorSpriteExtractor.Window
                     case ESelection.Texture_2D:
                         RemoveDuplicates(m_textures);
                         break;
+                    case ESelection.Texture_2D_Array:
+                        RemoveDuplicates(m_textureArrays);
+                        break;
                     case ESelection.Sprites:
                         RemoveDuplicates(m_sprites);
                         break;
@@ -223,7 +240,7 @@ namespace MyNamespace.EditorSpriteExtractor.Window
                         RemoveDuplicates(m_atlases);
                         break;
                 }
-                //
+                
                 _serializedObject.ApplyModifiedProperties();
 
                 switch (_selected)
@@ -231,8 +248,14 @@ namespace MyNamespace.EditorSpriteExtractor.Window
                     case ESelection.Texture_2D:
                         SpriteExtractorCore.Extract(_textures, _outputFolderPath, _encodeToFormat);
                         break;
+                    case ESelection.Texture_2D_Array:
+                        SpriteExtractorCore.Extract(_textureArrays, _outputFolderPath, _encodeToFormat);
+                        break;
                     case ESelection.Sprites:
                         SpriteExtractorCore.Extract(_sprites, _outputFolderPath, _encodeToFormat);
+                        break;
+                    case ESelection.Sprite_Atlas:
+                        SpriteExtractorCore.Extract(_atlases, _outputFolderPath, _encodeToFormat);
                         break;
                 }
 
@@ -260,6 +283,9 @@ namespace MyNamespace.EditorSpriteExtractor.Window
             {
                 case ESelection.Texture_2D:
                     EditorGUILayout.PropertyField(m_textures, true);
+                    break;
+                case ESelection.Texture_2D_Array:
+                    EditorGUILayout.PropertyField(m_textureArrays, true);
                     break;
                 case ESelection.Sprites:
                     EditorGUILayout.PropertyField(m_sprites, true);
@@ -312,7 +338,7 @@ namespace MyNamespace.EditorSpriteExtractor.Window
             _outputFolderPath = Path.Combine(project, folderPath);
         }
 
-        private void RemoveFullyProcessed_TextureFromArray(System.Object sender, Texture2D texture2D)
+        private void RemoveFullyProcessed_Texture2D(System.Object sender, Texture2D texture2D)
         {
             for (int i = 0; i < _textures.Length; i++)
             {
@@ -327,7 +353,22 @@ namespace MyNamespace.EditorSpriteExtractor.Window
             _serializedObject.ApplyModifiedProperties();
         }
 
-        private void RemoveFullyProcessed_SpriteFromArray(System.Object sender, Sprite sprite)
+        private void RemoveFullyProcessed_Texture2DArray(System.Object sender, Texture2DArray texture2DArray)
+        {
+            for (int i = 0; i < _textureArrays.Length; i++)
+            {
+                if (_textureArrays[i].Equals(texture2DArray))
+                {
+                    m_textureArrays.DeleteArrayElementAtIndex(i);
+                    Debug.Log($"Post Process Removed:  {texture2DArray.name}");
+                    break;
+                }
+            }
+
+            _serializedObject.ApplyModifiedProperties();
+        }
+
+        private void RemoveFullyProcessed_Sprite(System.Object sender, Sprite sprite)
         {
             for (int i = 0; i < _sprites.Length; i++)
             {
@@ -342,7 +383,7 @@ namespace MyNamespace.EditorSpriteExtractor.Window
             _serializedObject.ApplyModifiedProperties();
         }
 
-        private void RemoveFullyProcessed_Sprite_Atlas_FromArray(System.Object sender, SpriteAtlas atlas)
+        private void RemoveFullyProcessed_SpriteAtlas(System.Object sender, SpriteAtlas atlas)
         {
             for (int i = 0; i < _atlases.Length; i++)
             {

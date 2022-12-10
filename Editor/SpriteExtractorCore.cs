@@ -1,11 +1,14 @@
+using PlasticPipe.Tube;
 using System;
 using System.IO;
+using System.Security.Policy;
 using Unity.Collections;
 using UnityEditor;
 using UnityEditor.U2D;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.U2D;
+using static MyNamespace.EditorSpriteExtractor.SpriteExtractorCore;
 
 namespace MyNamespace.EditorSpriteExtractor
 {
@@ -15,6 +18,25 @@ namespace MyNamespace.EditorSpriteExtractor
         /* To Do
          * 
          *  Texture2DArray
+         *  SpriteAtlas
+         *  
+         *  DRY filePath
+         *  Extensions (this)
+         *  
+         */
+
+        /* Notes
+         * 
+         *  Non Power of 2 problems can be fixed by 
+         *  packing the sprite into a Sprite Atlas, 
+         *  which will always be a power of 2. 
+         *  
+         *  Or adjusting 'Non-Power of 2' in Texture Import settings for the asset. 
+         *  
+         *  https://docs.unity3d.com/ScriptReference/Graphics.CopyTexture.html
+         *  Graphics.CopyTexture()
+         *  
+         *  Encoding format recognized by file extension. Can be improved?
          * 
          */
 
@@ -22,6 +44,10 @@ namespace MyNamespace.EditorSpriteExtractor
          * 
          *  This class does not modify any existing files. 
          *  Exception:  Will overwrite files with the same path and name as the output.
+         *  
+         *  Texture files do Not need isReadable, 
+         *  because the file bytes are read by System.IO, 
+         *  and loaded directly into a Texture2D.
          * 
          */
 
@@ -29,6 +55,7 @@ namespace MyNamespace.EditorSpriteExtractor
         public static event EventHandler<Texture2D> OnProcessed_Texture;
         public static event EventHandler<Sprite> OnProcessed_Sprite;
         public static event EventHandler<SpriteAtlas> OnProcessed_SpriteAtlas;
+        public static event EventHandler<Texture2DArray> OnProcessed_Texture2DArray;
         public static event EventHandler<string> OnProcessed_OutputFilePath;
 
         public static EncodeToFormat[] EncodingFormats { get; private set; }
@@ -48,42 +75,95 @@ namespace MyNamespace.EditorSpriteExtractor
         }
         #endregion
 
-        #region Sprite Atlas (untested, unfinished)
-        // Extract SpriteAtlas Array.
-        private static void Extract(SpriteAtlas[] spriteAtlas_array, string outputFolderPath, EncodeToFormat encodeToFormat, bool useAtlasTextureImportSettings)
+        // Extract SpriteAtlas.
+        public static void Extract(SpriteAtlas[] spriteAtlas_array, string outputFolderPath, EncodeToFormat encodeToFormat)
         {
             foreach (SpriteAtlas atlas in spriteAtlas_array)
             {
-                //if (atlas) Extract(atlas);
+                if (atlas) Extract(atlas, outputFolderPath, encodeToFormat);
             }
         }
 
-        // Extract SpriteAtlas.
-        private static void Extract(SpriteAtlas atlas, string outputFolderPath, EncodeToFormat encodeToFormat, bool useAtlasTextureImportSettings)
+        public static void Extract(SpriteAtlas atlas, string outputFolderPath, EncodeToFormat encodeToFormat)
         {
-            // Validate
-
             string path = AssetDatabase.GetAssetPath(atlas);
-            Sprite[] sprites = (Sprite[])AssetDatabase.LoadAllAssetRepresentationsAtPath(path);
+            Sprite[] sprites = new Sprite[atlas.spriteCount];// = (Sprite[])AssetDatabase.LoadAllAssetRepresentationsAtPath(path); // Specified Cast is not valid. 
+            atlas.GetSprites(sprites);
 
             foreach (Sprite sprite in sprites)
             {
                 string filePath = $"{outputFolderPath}/{sprite.name}.";
                 Extract(sprite, filePath, encodeToFormat);
             }
-        }
-        #endregion
 
-        #region Texture 2D Array
+            OnProcessed_SpriteAtlas?.Invoke(nameof(SpriteExtractorCore), atlas);
+        }
+
         // Extract Texture2DArray.
-        private static void Extract(Texture2DArray source, string outputFolderPath, EncodeToFormat encodeToFormat, bool useAtlasTextureImportSettings)
+        public static void Extract(Texture2DArray[] texture2dArrayArray, string outputFolderPath, EncodeToFormat encodeToFormat)
         {
-            //source.
+            foreach (Texture2DArray array in texture2dArrayArray)
+            {
+                if (array) Extract(array, outputFolderPath, encodeToFormat);
+            }
         }
-        #endregion
 
-        #region Texture2D
-        // Extract Texture2D Array.
+        public static void Extract(Texture2DArray texture2dArray, string outputFolderPath, EncodeToFormat encodeToFormat)
+        {
+            // Get texture element size. 
+            TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(texture2dArray));
+            TextureImporterSettings settings = new TextureImporterSettings();
+            importer.ReadTextureSettings(settings);
+
+            int rows = settings.flipbookRows;
+            int columns = settings.flipbookColumns;
+
+            // Readability.
+            Vector2Int size = new Vector2Int()
+            {
+                x = texture2dArray.width,
+                y = texture2dArray.height
+            };
+
+            Debug.Log($"size: {size}");
+
+            // Create Rects for each element.
+            Rect[] rects = new Rect[texture2dArray.depth];
+
+            int index = 0;
+            int x = 0;
+            int y = 0;
+            for (int row = 0; row < rows; row++)
+            {
+                for (int column = 0; column < columns; column++)
+                {
+                    rects[index++] = new Rect(x, y, size.x, size.y);
+                    x += size.x;
+                }
+                x = 0;
+                y += size.y;
+            }
+
+            // Initialize a temporary container for the original texture file.
+            Texture2D rawTexture = RawCopyOf(texture2dArray);
+
+            GetEncodeToFormat(texture2dArray, ref encodeToFormat);
+
+            // Extract each Rect from the original texture. 
+            for (int i = 0; i < rects.Length; i++)
+            {
+                string filePath = $"{outputFolderPath}/{texture2dArray.name}_{i}.";
+
+                // Write to disk. 
+                EncodeAndWriteToDisk(SubTexture(rawTexture, rects[i]), ref filePath, encodeToFormat);
+
+                OnProcessed_OutputFilePath?.Invoke(typeof(SpriteExtractorCore), filePath);
+            }
+
+            OnProcessed_Texture2DArray?.Invoke(typeof(SpriteExtractorCore), texture2dArray);
+        }
+
+        // Extract Texture2D.
         public static void Extract(Texture2D[] array, string outputFolderPath, EncodeToFormat encodeToFormat)
         {
             foreach (Texture2D texture in array)
@@ -92,11 +172,11 @@ namespace MyNamespace.EditorSpriteExtractor
             }
         }
 
-        // Extract Texture2D.
         public static void Extract(Texture2D texture2d, string outputFolderPath, EncodeToFormat encodeToFormat)
         {
-            // Validation
-            if (!HasRequiredImportSettings(texture2d)) return;
+            // If this validation fails, the Texture2D is not processed.
+            TextureImporter importer = (TextureImporter)TextureImporter.GetAtPath(AssetDatabase.GetAssetPath(texture2d));
+            if (importer.textureType != TextureImporterType.Sprite) return;
 
             string assetPath = AssetDatabase.GetAssetPath(texture2d);
             UnityEngine.Object[] subassets = AssetDatabase.LoadAllAssetRepresentationsAtPath(assetPath);
@@ -108,36 +188,53 @@ namespace MyNamespace.EditorSpriteExtractor
                 sprites[i] = (Sprite)subassets[i];
             }
 
-            Extract(sprites, outputFolderPath, encodeToFormat);
+            //Extract(sprites, outputFolderPath, encodeToFormat);
+            Extract(sprites, outputFolderPath, encodeToFormat, RawCopyOf(texture2d));
 
             // Notify that this Texture2D was fully processed.
             OnProcessed_Texture?.Invoke(typeof(SpriteExtractorCore), texture2d);
         }
-        #endregion
 
-        #region Sprite
-        // Extract Sprite Array.
-        public static void Extract(Sprite[] sprites, string outputFolderPath, EncodeToFormat encodeToFormat)
+        // Extract Sprites.
+        public static void Extract(Sprite[] sprites, string outputFolderPath, EncodeToFormat encodeToFormat, Texture2D rawTexture = null)
         {
             foreach (Sprite sprite in sprites)
             {
                 if (sprite)
                 {
                     string filePath = $"{outputFolderPath}/{sprite.name}.";
-                    Extract(sprite, filePath, encodeToFormat);
+                    Extract(sprite, filePath, encodeToFormat, rawTexture);
                 }
             }
         }
 
-        // Extract Sprite.
-        public static void Extract(Sprite sprite, string outputFileNamePath, EncodeToFormat encodeToFormat)
+        public static void Extract(Sprite sprite, string outputFileNamePath, EncodeToFormat encodeToFormat, Texture2D rawTexture = null)
         {
-            string filePath = AssetDatabase.GetAssetPath(sprite.texture);
+            GetEncodeToFormat(sprite.texture, ref encodeToFormat);
+
+            // If no raw copy of the texture exists, create one. 
+            // A raw copy is passed when extracting multiple sprites from a single Texture2D,
+            // so that a texture copy is not made for each sprite extracted. It is an optimization that might be worth while for big tasks. 
+            // Further optimization can be achieved, by caching textures in the static.
+            if (rawTexture == null) rawTexture = RawCopyOf(sprite.texture);
+
+            // Extract Sprite subtexture. 
+            Texture2D spriteSubTexture = SubTexture(rawTexture, sprite.rect);
+
+            EncodeAndWriteToDisk(spriteSubTexture, ref outputFileNamePath, encodeToFormat);
+
+            // Notify that this Sprite was fully processed.
+            OnProcessed_Sprite?.Invoke(typeof(SpriteExtractorCore), sprite);
+            OnProcessed_OutputFilePath?.Invoke(typeof(SpriteExtractorCore), outputFileNamePath);
+        }
+
+        // Fix file name, because Sprites do not always have unique names. Create the file name for the sprite beforehand, with a number. 
+
+        public static void GetEncodeToFormat(Texture texture, ref EncodeToFormat encodeToFormat)
+        {
+            string filePath = AssetDatabase.GetAssetPath(texture);
             FileInfo file = new FileInfo(filePath);
             string extension = file.Extension.Substring(1);
-
-            Debug.Log("File Path:  " + filePath);
-            Debug.Log("File Extension:  " + file.Extension);
 
             for (int i = 0; i < EncodingFormats.Length; i++)
             {
@@ -147,28 +244,27 @@ namespace MyNamespace.EditorSpriteExtractor
                     break;
                 }
             }
+        }
 
-            // Extract Sprite Texture.
-            Texture2D spriteSubTexture = CropTexture(sprite.texture, sprite.rect);
-
-            byte[] data;
-
+        public static void EncodeAndWriteToDisk(Texture2D rawTexture2d, ref string outputFileNamePath, EncodeToFormat encodeToFormat)
+        {
             // Encode Data.
+            byte[] data;
             switch (encodeToFormat)
             {
                 case EncodeToFormat.Source:
                     throw new Exception($"{nameof(EncodeToFormat)} format could not be determined, or is unsupported.  Is the filename missing an extension?");
                 case EncodeToFormat.EXR:
-                    data = spriteSubTexture.EncodeToEXR();
+                    data = rawTexture2d.EncodeToEXR();
                     break;
                 case EncodeToFormat.JPG:
-                    data = spriteSubTexture.EncodeToJPG();
+                    data = rawTexture2d.EncodeToJPG();
                     break;
                 case EncodeToFormat.PNG:
-                    data = spriteSubTexture.EncodeToPNG();
+                    data = rawTexture2d.EncodeToPNG();
                     break;
                 case EncodeToFormat.TGA:
-                    data = spriteSubTexture.EncodeToTGA();
+                    data = rawTexture2d.EncodeToTGA();
                     break;
                 default:
                     throw new ArgumentNullException($"{nameof(EncodeToFormat)} value cannot be null.");
@@ -179,39 +275,33 @@ namespace MyNamespace.EditorSpriteExtractor
 
             // Write Data to Disk.
             File.WriteAllBytes(outputFileNamePath, data);
-
-            // Notify that this Sprite was fully processed.
-            OnProcessed_Sprite?.Invoke(typeof(SpriteExtractorCore), sprite);
-            OnProcessed_OutputFilePath?.Invoke(typeof(SpriteExtractorCore), outputFileNamePath);
-        }
-        #endregion
-
-        #region Utilities
-        // Validation. 
-        public static bool HasRequiredImportSettings(Texture2D spriteTexture)
-        {
-            TextureImporter importer = (TextureImporter)TextureImporter.GetAtPath(AssetDatabase.GetAssetPath(spriteTexture));
-            //if (importer.isReadable == false) return false; // Not required?
-            if (importer.textureType != TextureImporterType.Sprite) return false;
-            //if (importer.spriteImportMode != SpriteImportMode.Multiple) return false;
-            //if (importer.maxTextureSize != 8192) return false;
-            return true;
         }
 
-        private static void CropTextureRAW(Sprite sprite)
+        private static Texture2D RawCopyOf(Texture texture2dMaybeArray)
         {
-            CropTextureRAW(sprite.texture, sprite.rect);
+            // Initialize a temporary container for the original texture. 
+            Texture2D rawCopy = new Texture2D(texture2dMaybeArray.width, texture2dMaybeArray.height, TextureFormat.RGBA32, false)
+            {
+                filterMode = FilterMode.Point,
+                anisoLevel = 0,
+                requestedMipmapLevel = 0,
+            };
+
+            // Read the original file byte array. 
+            rawCopy.LoadImage(File.ReadAllBytes(AssetDatabase.GetAssetPath(texture2dMaybeArray)));
+            return rawCopy;
         }
 
-        private static Texture2D CropTextureRAW(Texture2D texture, Rect rect)
+        private static Texture2D SubTexture(Texture2D texture, Rect rect)
         {
-            int top = (int)rect.y;
+            // Rect values.
             int left = (int)rect.x;
+            int top = (int)rect.y;
             int width = (int)rect.width;
             int height = (int)rect.height;
 
-            // Compensate for textures with negative coordinates. 
-            // Thanks to Artgig @ answers.unity.com
+            // Compensate for textures with negative coordinates.
+            // Thanks to Artgig @ answers.unity.com.
             // Source: https://answers.unity.com/questions/683772/export-sprite-sheets.html
             if (left < 0)
             {
@@ -236,17 +326,6 @@ namespace MyNamespace.EditorSpriteExtractor
                 throw new Exception($"{rect}. Sprite position or size does not correspond with Texture coordinates or dimensions. {new Rect(0, 0, texture.width, texture.height)}");
             }
 
-            // Initialize a temporary container for the original texture. 
-            Texture2D rawCopy = new Texture2D(texture.width, texture.height, TextureFormat.RGBA32, false)
-            {
-                filterMode = FilterMode.Point,
-                anisoLevel = 0,
-                requestedMipmapLevel = 0,
-            };
-
-            // Read the original file byte array. 
-            rawCopy.LoadImage(File.ReadAllBytes(AssetDatabase.GetAssetPath(texture)));
-
             // Initialize a container for the subtexture. 
             Texture2D subtexture = new Texture2D(width, height, TextureFormat.RGBA32, false)
             {
@@ -255,88 +334,11 @@ namespace MyNamespace.EditorSpriteExtractor
                 requestedMipmapLevel = 0,
             };
 
-            // Read and write directly to memory in the GPU. 
-            NativeArray<Color> nativeRawCopy = rawCopy.GetRawTextureData<Color>();
-            NativeArray<Color> nativeSubTexture = subtexture.GetRawTextureData<Color>();
-
-            int write = 0;
-            for (int y = 0; y < height; y++)
-            {
-                int read = (y + top) * texture.width + left;
-                for (int x = 0; x < width; x++)
-                {
-                    // Get subtexture pixels. 
-                    nativeSubTexture[write++] = nativeRawCopy[read++];
-                }
-            }
+            // Get and set the pixels. 
+            subtexture.SetPixels(texture.GetPixels(left, top, width, height, 0));
+            subtexture.Apply();
 
             return subtexture;
         }
-
-        // Extract Subtexture. 
-        private static Texture2D CropTexture(Texture2D pSource, Rect rect)
-        {
-            // Source:  https://answers.unity.com/questions/683772/export-sprite-sheets.html
-            // Thanks to Artgig @ answers.unity.com!
-
-            // <Modification>
-            int left = (int)rect.x;
-            int top = (int)rect.y;
-            int width = (int)rect.width;
-            int height = (int)rect.height;
-            // </Modification>
-
-            if (left < 0)
-            {
-                width += left;
-                left = 0;
-            }
-            if (top < 0)
-            {
-                height += top;
-                top = 0;
-            }
-            if (left + width > pSource.width)
-            {
-                width = pSource.width - left;
-            }
-            if (top + height > pSource.height)
-            {
-                height = pSource.height - top;
-            }
-
-            if (width <= 0 || height <= 0)
-            {
-                throw new Exception($"{rect}. Sprite position or size does not correspond with Texture coordinates or dimensions. {new Rect(0, 0, pSource.width, pSource.height)}");
-            }
-
-            Color[] aSourceColor = pSource.GetPixels(0);
-
-
-            //*** Make New 
-            Texture2D oNewTex = new Texture2D(width, height, pSource.format, false); // Swapped TextureFormat.RGBA32 for pSource.format
-
-            //*** Make destination array
-            int xLength = width * height;
-            Color[] aColor = new Color[xLength];
-            
-            int i = 0;
-            for (int y = 0; y < height; y++)
-            {
-                int sourceIndex = (y + top) * pSource.width + left;
-                for (int x = 0; x < width; x++)
-                {
-                    aColor[i++] = aSourceColor[sourceIndex++];
-                }
-            }
-
-            //*** Set Pixels
-            oNewTex.SetPixels(aColor);
-            oNewTex.Apply();
-
-            //*** Return
-            return oNewTex;
-        }
-        #endregion
     }
 }
