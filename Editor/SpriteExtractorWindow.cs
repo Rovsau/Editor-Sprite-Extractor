@@ -1,6 +1,5 @@
 using System.IO;
 using UnityEditor;
-using UnityEditor.U2D;
 using UnityEngine;
 using UnityEngine.U2D;
 
@@ -25,29 +24,38 @@ namespace MyNamespace.EditorSpriteExtractor.Window
 {
     internal class SpriteExtractorWindow : EditorWindow
     {
-        #region Constants
-        private const string __README_HEADER = "";
+        // Debug
+        private static bool TRACE = false;
 
-        private const string __README_TEXTURE2D = 
-            __README_HEADER + 
+        #region Info
+        private const string __INFO_HEADER = "";
+
+        private const string __INFO_TEXTURE2D = 
+            __INFO_HEADER + 
             "Extract all Sprites from a Texture2D with Sprite Mode: Single or Multiple.";
 
-        private const string __README_TEXTURE2DARRAY =
-            __README_HEADER +
+        private const string __INFO_TEXTURE2DARRAY =
+            __INFO_HEADER +
             "Extract all elements from a Texture2DArray with predefined Columns and Rows.";
 
-        private const string __README_SPRITES =
-            __README_HEADER +
+        private const string __INFO_SPRITES =
+            __INFO_HEADER +
             "Extract Sprites from their source Texture2D with Sprite Mode: Single or Multiple.";
 
-        private const string __README_SPRITE_ATLAS =
-            __README_HEADER +
+        private const string __INFO_SPRITE_ATLAS =
+            __INFO_HEADER +
             "Extract all Sprites in a Sprite Atlas, from their respective texture files.\n";
 
-        private string _readMe;
+        private string _info;
         #endregion
 
         #region Variables
+        private const string __CONFIGURATION = "Configuration";
+        private const string __EXTRACTFROM = "Extract from";
+        private const string __ENCODETOFORMAT = "Encode to Format";
+        private const string __OUTPUTFOLDER = "Output Folder";
+
+
         private static SpriteExtractorWindow _window;
         private static bool _isOpen;
 
@@ -183,12 +191,12 @@ namespace MyNamespace.EditorSpriteExtractor.Window
             // GUI Checkpoint. <---
             EditorGUILayout.BeginVertical(SpriteExtractorStyles.MainWrapper);
             EditorGUILayout.BeginVertical(SpriteExtractorStyles.Area_Config);
-            EditorGUILayout.LabelField("Configuration", SpriteExtractorStyles.Title);
+            EditorGUILayout.LabelField(__CONFIGURATION, SpriteExtractorStyles.Title);
 
             #region Encode to Format
             EditorGUILayout.Space();
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.PrefixLabel("Encode to Format");
+            EditorGUILayout.PrefixLabel(__ENCODETOFORMAT);
             _encodeToFormat = (SpriteExtractorCore.EncodeToFormat)EditorGUILayout.EnumPopup(_encodeToFormat);
             EditorGUILayout.EndHorizontal();
             #endregion
@@ -196,7 +204,7 @@ namespace MyNamespace.EditorSpriteExtractor.Window
             #region Output Folder
             EditorGUILayout.Space();
             // Can still be a Scene object. Could be fixed. Low prio. 
-            _outputFolder = (DefaultAsset)EditorGUILayout.ObjectField("Output Folder", _outputFolder, typeof(DefaultAsset), false);
+            _outputFolder = (DefaultAsset)EditorGUILayout.ObjectField(__OUTPUTFOLDER, _outputFolder, typeof(DefaultAsset), false);
             #endregion
             
             EditorGUILayout.LabelField(string.Empty, SpriteExtractorStyles.HorizontalSeparator);
@@ -204,15 +212,37 @@ namespace MyNamespace.EditorSpriteExtractor.Window
             #region Radio selection
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.BeginVertical(SpriteExtractorStyles.Area_Config_Left);
-            EditorGUILayout.LabelField("Extract from", SpriteExtractorStyles.Title);
+            EditorGUILayout.LabelField(__EXTRACTFROM, SpriteExtractorStyles.Title);
             EditorGUILayout.Space();
             _selected = (ESelection)GUILayout.SelectionGrid((int)_selected, _options, 1, SpriteExtractorStyles.RadioButton);
 
             EditorGUILayout.Space();
 
+
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.BeginVertical();
+            #region Help Box
+            switch (_selected)
+            {
+                case ESelection.Texture_2D:
+                    _info = __INFO_TEXTURE2D;
+                    break;
+                case ESelection.Texture_2D_Array:
+                    _info = __INFO_TEXTURE2DARRAY;
+                    break;
+                case ESelection.Sprites:
+                    _info = __INFO_SPRITES;
+                    break;
+                case ESelection.Sprite_Atlas:
+                    _info = __INFO_SPRITE_ATLAS;
+                    break;
+            }
+            EditorGUILayout.LabelField(_info, SpriteExtractorStyles.HelpBox);
+            #endregion
+            EditorGUILayout.Space(12f);
             #region Button
             if (!_outputFolder) GUI.enabled = false;
-            if (GUILayout.Button("Extract All Sprites", SpriteExtractorStyles.Button))
+            if (GUILayout.Button($"Extract {_options[(int)_selected].Trim()}", SpriteExtractorStyles.Button))
             {
                 GetOutputFolderPath();
 
@@ -254,27 +284,6 @@ namespace MyNamespace.EditorSpriteExtractor.Window
             }
             GUI.enabled = true;
             #endregion 
-
-            EditorGUILayout.EndVertical();
-            EditorGUILayout.BeginVertical();
-            #region Help Box
-            switch (_selected)
-            {
-                case ESelection.Texture_2D:
-                    _readMe = __README_TEXTURE2D;
-                    break;
-                case ESelection.Texture_2D_Array:
-                    _readMe = __README_TEXTURE2DARRAY;
-                    break;
-                case ESelection.Sprites:
-                    _readMe = __README_SPRITES;
-                    break;
-                case ESelection.Sprite_Atlas:
-                    _readMe = __README_SPRITE_ATLAS;
-                    break;
-            }
-            EditorGUILayout.LabelField(_readMe, SpriteExtractorStyles.HelpBox);
-            #endregion
             EditorGUILayout.EndVertical();
             EditorGUILayout.EndHorizontal();
             #endregion
@@ -351,7 +360,7 @@ namespace MyNamespace.EditorSpriteExtractor.Window
                 if (_texture2D[i].Equals(texture2D))
                 {
                     m_texture2D.DeleteArrayElementAtIndex(i);
-                    Debug.Log($"Post Process Removed:  {texture2D.name}");
+                    if (TRACE) Debug.Log($"Post Process Removed:  {texture2D.name}");
                     break;
                 }
             }
@@ -366,7 +375,7 @@ namespace MyNamespace.EditorSpriteExtractor.Window
                 if (_texture2DArray[i].Equals(texture2DArray))
                 {
                     m_texture2DArray.DeleteArrayElementAtIndex(i);
-                    Debug.Log($"Post Process Removed:  {texture2DArray.name}");
+                    if (TRACE) Debug.Log($"Post Process Removed:  {texture2DArray.name}");
                     break;
                 }
             }
@@ -381,7 +390,7 @@ namespace MyNamespace.EditorSpriteExtractor.Window
                 if (_sprites[i].Equals(sprite))
                 {
                     m_sprites.DeleteArrayElementAtIndex(i);
-                    Debug.Log($"Post Process Removed:  {sprite.name}");
+                    if (TRACE) Debug.Log($"Post Process Removed:  {sprite.name}");
                     break;
                 }
             }
@@ -396,7 +405,7 @@ namespace MyNamespace.EditorSpriteExtractor.Window
                 if (_spriteAtlas[i].Equals(atlas))
                 {
                     m_spriteAtlas.DeleteArrayElementAtIndex(i);
-                    Debug.Log($"Post Process Removed:  {atlas.name}");
+                    if (TRACE) Debug.Log($"Post Process Removed:  {atlas.name}");
                     break;
                 }
             }
@@ -425,7 +434,7 @@ namespace MyNamespace.EditorSpriteExtractor.Window
                 {
                     if (SerializedProperty.DataEquals(sp.GetArrayElementAtIndex(i), sp.GetArrayElementAtIndex(r)))
                     {
-                        Debug.Log($"Removing Duplicate:  {sp.GetArrayElementAtIndex(r).objectReferenceValue}");
+                        if (TRACE) Debug.Log($"Removing Duplicate:  {sp.GetArrayElementAtIndex(r).objectReferenceValue}");
                         sp.DeleteArrayElementAtIndex(r);
                     }
                 }

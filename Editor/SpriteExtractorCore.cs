@@ -51,9 +51,9 @@ namespace MyNamespace.EditorSpriteExtractor
         #endregion
 
         // Extract SpriteAtlas.
-        public static void Extract(this SpriteAtlas[] spriteAtlas_array, string outputFolderPath, EncodeToFormat encodeToFormat)
+        public static void Extract(this SpriteAtlas[] array, string outputFolderPath, EncodeToFormat encodeToFormat)
         {
-            foreach (SpriteAtlas atlas in spriteAtlas_array)
+            foreach (SpriteAtlas atlas in array)
             {
                 if (atlas) Extract(atlas, outputFolderPath, encodeToFormat);
             }
@@ -75,11 +75,11 @@ namespace MyNamespace.EditorSpriteExtractor
         }
 
         // Extract Texture2DArray.
-        public static void Extract(this Texture2DArray[] texture2dArrayArray, string outputFolderPath, EncodeToFormat encodeToFormat)
+        public static void Extract(this Texture2DArray[] array, string outputFolderPath, EncodeToFormat encodeToFormat)
         {
-            foreach (Texture2DArray array in texture2dArrayArray)
+            foreach (Texture2DArray element in array)
             {
-                if (array) Extract(array, outputFolderPath, encodeToFormat);
+                if (element) Extract(element, outputFolderPath, encodeToFormat);
             }
         }
 
