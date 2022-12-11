@@ -1,3 +1,4 @@
+using Codice.Client.Common.GameUI;
 using System;
 using System.IO;
 using UnityEditor;
@@ -20,7 +21,7 @@ namespace MyNamespace.EditorSpriteExtractor
          *  and loaded directly into a temporary Texture2D.
          *  
          *  Exception: 
-         *      Texture2D 
+         *      Texture2D requires the following importer settings.
          *      Texture Type:   2D Sprite 
          *      Sprite Mode:    Single or Multiple
          * 
@@ -39,6 +40,8 @@ namespace MyNamespace.EditorSpriteExtractor
         {
             EncodingFormats = (EncodeToFormat[])System.Enum.GetValues(typeof(EncodeToFormat));
         }
+
+        public static int derp { get; private set; }
 
         public enum EncodeToFormat
         {
@@ -198,7 +201,6 @@ namespace MyNamespace.EditorSpriteExtractor
             OnProcessed_OutputFilePath?.Invoke(typeof(SpriteExtractorCore), outputFileNamePath);
         }
 
-        // Fix file name, because Sprites do not always have unique names. Create the file name for the sprite beforehand, with a number. 
         private static void GetEncodeToFormat(Texture texture, ref EncodeToFormat encodeToFormat)
         {
             string filePath = AssetDatabase.GetAssetPath(texture);

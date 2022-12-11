@@ -25,7 +25,7 @@ namespace MyNamespace.EditorSpriteExtractor.Window
     internal class SpriteExtractorWindow : EditorWindow
     {
         // Debug
-        private static bool TRACE = false;
+        private static readonly bool TRACE = false;
 
         #region Info
         private const string __INFO_HEADER = "";
@@ -42,7 +42,7 @@ namespace MyNamespace.EditorSpriteExtractor.Window
             __INFO_HEADER +
             "Extract Sprites from their source Texture2D with Sprite Mode: Single or Multiple.";
 
-        private const string __INFO_SPRITE_ATLAS =
+        private const string __INFO_SPRITEATLAS =
             __INFO_HEADER +
             "Extract all Sprites in a Sprite Atlas, from their respective texture files.\n";
 
@@ -51,9 +51,9 @@ namespace MyNamespace.EditorSpriteExtractor.Window
 
         #region Variables
         private const string __CONFIGURATION = "Configuration";
-        private const string __EXTRACTFROM = "Extract from";
+        private const string __EXTRACTFROM = "From";
         private const string __ENCODETOFORMAT = "Encode to Format";
-        private const string __OUTPUTFOLDER = "Output Folder";
+        private const string __OUTPUTFOLDER = "Destination Folder";
 
 
         private static SpriteExtractorWindow _window;
@@ -181,6 +181,7 @@ namespace MyNamespace.EditorSpriteExtractor.Window
         {
             // 
             ConditionallyUpdateSerializedProperties();
+            UpdateSelectionInfo();
 
             // Reject selections that are not real folders. (DefaultAsset workaround). 
             if (_outputFolder != null && !AssetDatabase.IsValidFolder(AssetDatabase.GetAssetPath(_outputFolder))) _outputFolder = null;
@@ -213,30 +214,12 @@ namespace MyNamespace.EditorSpriteExtractor.Window
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.BeginVertical(SpriteExtractorStyles.Area_Config_Left);
             EditorGUILayout.LabelField(__EXTRACTFROM, SpriteExtractorStyles.Title);
-            EditorGUILayout.Space();
+            EditorGUILayout.Space(4f);
             _selected = (ESelection)GUILayout.SelectionGrid((int)_selected, _options, 1, SpriteExtractorStyles.RadioButton);
-
-            EditorGUILayout.Space();
-
-
+            EditorGUILayout.Space(4f );
             EditorGUILayout.EndVertical();
             EditorGUILayout.BeginVertical();
             #region Help Box
-            switch (_selected)
-            {
-                case ESelection.Texture_2D:
-                    _info = __INFO_TEXTURE2D;
-                    break;
-                case ESelection.Texture_2D_Array:
-                    _info = __INFO_TEXTURE2DARRAY;
-                    break;
-                case ESelection.Sprites:
-                    _info = __INFO_SPRITES;
-                    break;
-                case ESelection.Sprite_Atlas:
-                    _info = __INFO_SPRITE_ATLAS;
-                    break;
-            }
             EditorGUILayout.LabelField(_info, SpriteExtractorStyles.HelpBox);
             #endregion
             EditorGUILayout.Space(12f);
@@ -423,6 +406,26 @@ namespace MyNamespace.EditorSpriteExtractor.Window
 
                 // Necessary in order to get the proper context menu when right-clicking array elements. 
                 _serializedObject.ApplyModifiedProperties();
+            }
+        }
+
+
+        private void UpdateSelectionInfo()
+        {
+            switch (_selected)
+            {
+                case ESelection.Texture_2D:
+                    _info = __INFO_TEXTURE2D;
+                    break;
+                case ESelection.Texture_2D_Array:
+                    _info = __INFO_TEXTURE2DARRAY;
+                    break;
+                case ESelection.Sprites:
+                    _info = __INFO_SPRITES;
+                    break;
+                case ESelection.Sprite_Atlas:
+                    _info = __INFO_SPRITEATLAS;
+                    break;
             }
         }
 
