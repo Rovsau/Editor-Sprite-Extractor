@@ -1,9 +1,13 @@
-using Codice.Client.Common.GameUI;
 using System;
+using System.Drawing;
 using System.IO;
+using System.Runtime.InteropServices;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.U2D;
+using static MyNamespace.EditorSpriteExtractor.SpriteExtractorCore;
 
 namespace MyNamespace.EditorSpriteExtractor
 {
@@ -118,9 +122,7 @@ namespace MyNamespace.EditorSpriteExtractor
             }
 
             // Initialize a temporary container for the original texture file.
-            Texture2D rawTexture = RawCopyOf(texture2dArray);
-
-            GetEncodeToFormat(texture2dArray, ref encodeToFormat);
+            Texture2D rawTexture = RawCopyOf(texture2dArray, ref encodeToFormat);
 
             // Extract each Rect from the original texture. 
             for (int i = 0; i < rects.Length; i++)
@@ -128,7 +130,7 @@ namespace MyNamespace.EditorSpriteExtractor
                 string filePath = $"{outputFolderPath}/{texture2dArray.name}_{i}.";
 
                 // Write to disk. 
-                EncodeAndWriteToDisk(SubTexture(rawTexture, rects[i]), ref filePath, encodeToFormat);
+                EncodeAndWriteToDisk(SubTexture(rawTexture, rects[i], encodeToFormat), ref filePath, encodeToFormat);
 
                 OnProcessed_OutputFilePath?.Invoke(typeof(SpriteExtractorCore), filePath);
             }
@@ -161,8 +163,10 @@ namespace MyNamespace.EditorSpriteExtractor
                 sprites[i] = (Sprite)subassets[i];
             }
 
+            Texture2D raw = RawCopyOf(texture2d, ref encodeToFormat);
+
             //Extract(sprites, outputFolderPath, encodeToFormat);
-            Extract(sprites, outputFolderPath, encodeToFormat, RawCopyOf(texture2d));
+            Extract(sprites, outputFolderPath, encodeToFormat, raw);
 
             // Notify that this Texture2D was fully processed.
             OnProcessed_Texture?.Invoke(typeof(SpriteExtractorCore), texture2d);
@@ -183,40 +187,42 @@ namespace MyNamespace.EditorSpriteExtractor
 
         public static void Extract(this Sprite sprite, string outputFileNamePath, EncodeToFormat encodeToFormat, Texture2D rawTexture = null)
         {
-            GetEncodeToFormat(sprite.texture, ref encodeToFormat);
-
             // If no raw copy of the texture exists, create one. 
             // A raw copy is passed when extracting multiple sprites from a single Texture2D,
             // so that a texture copy is not made for each sprite extracted. It is an optimization that might be worth while for big tasks. 
             // Further optimization can be achieved, by caching textures in the static.
-            if (rawTexture == null) rawTexture = RawCopyOf(sprite.texture);
+            if (rawTexture == null) rawTexture = RawCopyOf(sprite.texture, ref encodeToFormat);
 
-            // Extract Sprite subtexture. 
-            Texture2D spriteSubTexture = SubTexture(rawTexture, sprite.rect);
-
-            EncodeAndWriteToDisk(spriteSubTexture, ref outputFileNamePath, encodeToFormat);
+            EncodeAndWriteToDisk(SubTexture(rawTexture, sprite.rect, encodeToFormat), ref outputFileNamePath, encodeToFormat);
 
             // Notify that this Sprite was fully processed.
             OnProcessed_Sprite?.Invoke(typeof(SpriteExtractorCore), sprite);
             OnProcessed_OutputFilePath?.Invoke(typeof(SpriteExtractorCore), outputFileNamePath);
         }
 
-        private static void GetEncodeToFormat(Texture texture, ref EncodeToFormat encodeToFormat)
+        private static string MaybeGetSourceEncodeToFormat(Texture texture, ref EncodeToFormat encodeToFormat)
         {
             string filePath = AssetDatabase.GetAssetPath(texture);
             FileInfo file = new FileInfo(filePath);
-            string extension = file.Extension.Substring(1);
+            string extension = file.Extension.Substring(1).ToLower();
+            
+            // Maybe not.
+            if (encodeToFormat != EncodeToFormat.Source) return extension;
 
             for (int i = 0; i < EncodingFormats.Length; i++)
             {
                 if (EncodingFormats[i].ToString().ToLower().EndsWith(extension))
                 {
                     encodeToFormat = EncodingFormats[i];
-                    break;
+                    return extension;
                 }
             }
+
+            // If source format cannot be determined, throw exception. 
+            throw new FormatException($"Source file format not supported. ({extension})");
         }
 
+        // If combined with SubTexture(), must include optionally passing in the raw texture.
         private static void EncodeAndWriteToDisk(Texture2D rawTexture2d, ref string outputFileNamePath, EncodeToFormat encodeToFormat)
         {
             // Encode Data.
@@ -226,7 +232,7 @@ namespace MyNamespace.EditorSpriteExtractor
                 case EncodeToFormat.Source:
                     throw new Exception($"{nameof(EncodeToFormat)} format could not be determined, or is unsupported.  Is the filename missing an extension?");
                 case EncodeToFormat.EXR:
-                    data = rawTexture2d.EncodeToEXR();
+                    data = rawTexture2d.EncodeToEXR(Texture2D.EXRFlags.OutputAsFloat);
                     break;
                 case EncodeToFormat.JPG:
                     data = rawTexture2d.EncodeToJPG();
@@ -238,7 +244,7 @@ namespace MyNamespace.EditorSpriteExtractor
                     data = rawTexture2d.EncodeToTGA();
                     break;
                 default:
-                    throw new ArgumentNullException($"{nameof(EncodeToFormat)} value cannot be null.");
+                    throw new ArgumentNullException($"{nameof(EncodeToFormat)} value somehow ended up as null.");
             }
 
             // Add File Extension.
@@ -248,7 +254,9 @@ namespace MyNamespace.EditorSpriteExtractor
             File.WriteAllBytes(outputFileNamePath, data);
         }
 
-        private static Texture2D RawCopyOf(Texture texture2dMaybeArray)
+        public struct byte3 { public byte x, y, z; }
+
+        private static Texture2D RawCopyOf(Texture texture2dMaybeArray, ref EncodeToFormat encodeToFormat)
         {
             // Initialize a temporary container for the original texture. 
             Texture2D rawCopy = new Texture2D(texture2dMaybeArray.width, texture2dMaybeArray.height, TextureFormat.RGBA32, false)
@@ -258,12 +266,35 @@ namespace MyNamespace.EditorSpriteExtractor
                 requestedMipmapLevel = 0,
             };
 
-            // Read the original file byte array. 
-            rawCopy.LoadImage(File.ReadAllBytes(AssetDatabase.GetAssetPath(texture2dMaybeArray)));
+            string fileExtension = MaybeGetSourceEncodeToFormat(texture2dMaybeArray, ref encodeToFormat).ToLower();
+
+            if (fileExtension == "exr")
+            {
+                Texture2D originalTexture = (Texture2D)texture2dMaybeArray;
+                UnityEngine.Debug.Log($"{originalTexture.format}"); // RGB24
+                NativeArray<byte3> exr = originalTexture.GetRawTextureData<byte3>();
+                NativeArray<byte> bytes = ImageConversion.EncodeNativeArrayToEXR(exr, originalTexture.graphicsFormat, (uint)originalTexture.width, (uint)originalTexture.height);
+                rawCopy.LoadRawTextureData(bytes.ToArray());
+
+                // https://docs.unity3d.com/ScriptReference/ImageConversion.EncodeNativeArrayToEXR.html
+                // https://answers.unity.com/questions/1817392/why-is-nativearray-always-shorter-than-the-number.html
+                Debug.Log($"EXR Passed.");
+            }
+            else if (fileExtension == "tga")
+            {
+                Texture2D originalTexture = (Texture2D)texture2dMaybeArray;
+                rawCopy.LoadRawTextureData(originalTexture.GetRawTextureData());
+            }
+            else
+            {
+                // Read the original file byte array. 
+                rawCopy.LoadImage(File.ReadAllBytes(AssetDatabase.GetAssetPath(texture2dMaybeArray)), false);
+            }
+
             return rawCopy;
         }
 
-        private static Texture2D SubTexture(Texture2D texture, Rect rect)
+        private static Texture2D SubTexture(Texture2D texture, Rect rect, EncodeToFormat encodeToFormat)
         {
             // Rect values.
             int left = (int)rect.x;
@@ -297,8 +328,26 @@ namespace MyNamespace.EditorSpriteExtractor
                 throw new Exception($"{rect}. Sprite position or size does not correspond with Texture coordinates or dimensions. {new Rect(0, 0, texture.width, texture.height)}");
             }
 
+            TextureFormat outputTextureFormat = TextureFormat.RGBA32;
+
+            switch (encodeToFormat)
+            {
+                case EncodeToFormat.EXR:
+                    outputTextureFormat = TextureFormat.RGBAFloat;
+                    break;
+                case EncodeToFormat.JPG:
+                    outputTextureFormat = TextureFormat.RGBA32;
+                    break;
+                case EncodeToFormat.PNG:
+                    outputTextureFormat = TextureFormat.RGBA32;
+                    break;
+                case EncodeToFormat.TGA:
+                    outputTextureFormat = TextureFormat.RGBA32;
+                    break;
+            }
+
             // Initialize a container for the subtexture. 
-            Texture2D subtexture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            Texture2D subtexture = new Texture2D(width, height, outputTextureFormat, false)
             {
                 filterMode = FilterMode.Point,
                 anisoLevel = 0,

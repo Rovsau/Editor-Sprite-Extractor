@@ -28,23 +28,10 @@ namespace MyNamespace.EditorSpriteExtractor.Window
         private static readonly bool TRACE = false;
 
         #region Info
-        private const string __INFO_HEADER = "";
-
-        private const string __INFO_TEXTURE2D = 
-            __INFO_HEADER + 
-            "Extract all Sprites from a Texture2D with Sprite Mode: Single or Multiple.";
-
-        private const string __INFO_TEXTURE2DARRAY =
-            __INFO_HEADER +
-            "Extract all elements from a Texture2DArray with predefined Columns and Rows.";
-
-        private const string __INFO_SPRITES =
-            __INFO_HEADER +
-            "Extract Sprites from their source Texture2D with Sprite Mode: Single or Multiple.";
-
-        private const string __INFO_SPRITEATLAS =
-            __INFO_HEADER +
-            "Extract all Sprites in a Sprite Atlas, from their respective texture files.\n";
+        private const string __INFO_TEXTURE2D = "Extract all Sprites from a Texture2D with Sprite Mode\nSingle or Multiple.";
+        private const string __INFO_TEXTURE2DARRAY = "Extract all elements from a Texture2DArray with predefined Columns and Rows.";
+        private const string __INFO_SPRITES = "Extract Sprites from their source Texture2D files.\n";
+        private const string __INFO_SPRITEATLAS = "Extract all Sprites in a Sprite Atlas, from their respective Texture2D files.";
 
         private string _info;
         #endregion
