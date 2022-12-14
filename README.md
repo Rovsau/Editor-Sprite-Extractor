@@ -1,6 +1,4 @@
 # Editor-Sprite-Extractor
- 
-## About
 Unity Editor tool for extracting all the individual parts of a texture, saving them to their own files. Such as extracting all sprites from a Texture2D or Sprite Atlas, or all the elements of a Texture2DArray.
 ## Disclaimer
 This is meant to be a functional tool to aid development inside the Unity Editor. This is not an advanced image processing tool. There are better solutions out there with more control over visual fidelity and wider support for image formats.
