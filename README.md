@@ -1,15 +1,16 @@
 # Editor-Sprite-Extractor
 Unity Editor tool for extracting all the individual parts of a texture, saving them to their own files. Such as extracting all sprites from a Texture2D or Sprite Atlas, or all the elements of a Texture2DArray.
 ## Disclaimer
-This is meant to be a functional tool to aid development inside the Unity Editor. This is not an advanced image processing tool. There are better solutions out there with more control over visual fidelity and wider support for image formats.
+This is meant to be a tool to aid development inside the Unity Editor, but it is not an advanced image processing tool. The format implementations are functional, yet rudimentary. There are better solutions out there with more control over visual fidelity and wider support for image formats. Quality can only be guaranteed when working exclusively with RGBA32 texture formats. 
 ## Format Support
-There is only Functional support for these formats. That means the current implementation is rudimentary, and image fidelity cannot be guaranteed, except when working exclusively with RGBA32 texture formats. 
 - PNG
 - JPG
 - EXR (output only)
 - TGA
 ## Unity Version Support
+- 2022.2 (untested)
 - 2021.3
+- 2020.3 (untested)
 ## How to use
 **Menu:** Window > 2D > Editor Sprite Extractor
 
