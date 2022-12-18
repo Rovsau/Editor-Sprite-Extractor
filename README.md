@@ -26,5 +26,7 @@ This is meant to be a tool to aid development inside the Unity Editor, but it is
 
 **SpriteAtlas:**  Extract all Sprites in a Sprite Atlas, from their respective Texture2D files.
 
+![Screenshot](https://i.ibb.co/z4cnnTP/image.png)
+
 ## EXR
 I was not able to successfully implement this format. Therefore this tool does not support reading EXR files, but it can create them from any of the other supported formats, with RGBAFloat (32bit) as the output texture format. (It can be hardcoded to RGBAHalf, 16bit)
